@@ -1,0 +1,63 @@
+# --- Environments ---
+# Ignores the virtual environment folder
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Config/Secrets ---
+# Ignores environment files and credentials
+*.env
+.env.*
+gcp_credentials.json
+
+# --- Byte-compiled / optimized / DLL files ---
+__pycache__/
+*.py[cod]
+*$py.class$
+
+# --- IDE / Editor ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS generated files ---
+.DS_Store
+Thumbs.db
+
+# --- Installer logs ---
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- Unit test / coverage reports ---
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+cover/
+
+# --- Other ---
+*.log
+*.log.*
+logs/
+
+# --- Distribution / packaging ---
+build/
+dist/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
