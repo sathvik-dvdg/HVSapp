@@ -4,19 +4,19 @@ from sqlalchemy.orm import Session
 
 # --- FIX: EXPLICITLY IMPORT ALL MODELS ---
 # This forces SQLAlchemy to register all models before any queries are run.
-from app.db.base_class import Base
-from app.models.user import User
-from app.models.patient import Patient
-from app.models.encounter import Encounter
-from app.models.note import ClinicalNote
-from app.models.task import NurseTask
+from src.db.base_class import Base
+from src.schemas.user import User
+from src.schemas.patient import Patient
+from src.schemas.encounter import Encounter
+from src.schemas.note import ClinicalNote
+from src.schemas.task import NurseTask
 # --- END FIX ---
 
 # Import other components
-from app.db.session import SessionLocal
-from app.schemas.user import UserCreate
-from app.services import user_service
-from app.models.user import UserRole 
+from src.db.session import SessionLocal
+from src.schemas.user import UserCreate
+from src.services import user_service
+from src.schemas.user import UserRole 
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
