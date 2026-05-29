@@ -8,11 +8,12 @@ from google.cloud import speech
 from google.api_core.exceptions import DeadlineExceeded, Cancelled
 
 # Import project components
-from src.schemas.session import SessionState
-from src.utils.connection_manager import manager # WebSocket manager
-from src.db.session import SessionLocal # Import SessionLocal to create a DB session
-from src.services import note_service # Import the note service
-from src.schemas.note import NoteType # Import the enum
+# Import project components
+from src.modules.transcription.schemas import SessionState
+from src.websocket.connection_manager import manager
+from src.db.session import SessionLocal 
+from src.modules.patients import note_service 
+from src.modules.patients.note_models import NoteType
 
 # --- ASR Configuration ---
 # Must match the audio format sent from the frontend app

@@ -5,12 +5,10 @@ from sqlalchemy.orm import Session
 # --- FIX: EXPLICITLY IMPORT ALL MODELS ---
 # This forces SQLAlchemy to register all models before any queries are run.
 from src.db.base_class import Base
-from src.schemas.user import User
-from src.schemas.patient import Patient
-from src.schemas.encounter import Encounter
-from src.schemas.note import ClinicalNote
-from src.schemas.task import NurseTask
-# --- END FIX ---
+from src.modules.auth.models import User, UserRole
+from src.modules.auth.schemas import UserCreate
+from src.modules.auth import service as user_service
+from src.modules.patients.models import Patient
 
 # Import other components
 from src.db.session import SessionLocal

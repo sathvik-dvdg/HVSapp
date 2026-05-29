@@ -20,7 +20,8 @@ from src.modules.patients import encounter_service
 
 # Note: You must verify exactly where you moved your notes logic. 
 # Assuming it is in the patient schemas/services:
-# from src.modules.patients.schemas import NoteRead
+from src.modules.patients.note_schemas import NoteRead
+from src.modules.patients import note_service
 # from src.modules.patients import note_service
 
 log = logging.getLogger(__name__)
