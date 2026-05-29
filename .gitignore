@@ -1,0 +1,125 @@
+# ==================================================
+# OS FILES
+# ==================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==================================================
+# IDE / EDITOR
+# ==================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==================================================
+# ENVIRONMENT VARIABLES & SECRETS
+# ==================================================
+.env
+.env.*
+!.env.example
+
+# Google / Cloud credentials
+backend/gcp_credentials.json
+*.pem
+*.key
+*.p12
+*.crt
+
+# ==================================================
+# PYTHON (BACKEND)
+# ==================================================
+backend/.venv/
+venv/
+ENV/
+env/
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python build artifacts
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Mypy / Ruff / cache
+.mypy_cache/
+.ruff_cache/
+
+# Logs
+*.log
+backend/src/logs/
+
+# SQLite
+*.sqlite3
+*.db
+
+# ==================================================
+# FASTAPI / UVICORN
+# ==================================================
+uvicorn.log
+
+# ==================================================
+# ALEMBIC
+# ==================================================
+alembic/versions/__pycache__/
+
+# ==================================================
+# NODE / REACT NATIVE / EXPO (FRONTEND)
+# ==================================================
+frontend/node_modules/
+
+# Expo
+frontend/.expo/
+frontend/.expo-shared/
+
+# Metro bundler
+frontend/.metro-health-check*
+
+# Logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# Build outputs
+frontend/dist/
+frontend/build/
+
+# Android build files
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/app/build/
+
+# Local properties
+frontend/android/local.properties
+
+# Expo native generated
+frontend/android/app/src/debug/
+frontend/android/app/src/debugOptimized/
+
+# ==================================================
+# TYPESCRIPT
+# ==================================================
+*.tsbuildinfo
+
+# ==================================================
+# TEMP FILES
+# ==================================================
+tmp/
+temp/
+*.tmp
+
+# ==================================================
+# PACKAGE MANAGER
+# ==================================================
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
