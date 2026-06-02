@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 from src.db.session import get_db
 from src.modules.auth.schemas import UserCreate, UserRead
 from src.modules.auth.token_schema import Token
+from src.modules.auth.models import UserRole
 from src.modules.auth import service as user_service
 from src.config.security import create_access_token
+from src.api.dependencies import get_optional_current_user
 
 log = logging.getLogger(__name__)
 
@@ -27,13 +29,21 @@ router = APIRouter()
 def register_user(
     *,
     db: Session = Depends(get_db),
-    user_in: UserCreate
+    user_in: UserCreate,
+    current_user: Any = Depends(get_optional_current_user),
 ) -> Any:
     """
     Create a new user (Doctor or Nurse).
     This is the initial self-registration endpoint.
     """
     log.info(f"Attempting registration for username: {user_in.username}")
+
+    if user_in.role in (UserRole.ADMIN, UserRole.DOCTOR):
+        if current_user is None or current_user.role != UserRole.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only an existing ADMIN can create ADMIN or DOCTOR accounts."
+            )
     
     # Check if user already exists
     user = user_service.get_user_by_username(db, username=user_in.username)

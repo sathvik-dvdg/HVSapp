@@ -27,6 +27,13 @@ backend/gcp_credentials.json
 *.p12
 *.crt
 
+/ios
+/android
+
+# strict env files
+.env.development
+.env.production
+
 # ==================================================
 # PYTHON (BACKEND)
 # ==================================================

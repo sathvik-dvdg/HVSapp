@@ -1,5 +1,6 @@
 import { Audio } from 'expo-av'; // For permission requests
 import { Alert } from 'react-native';
+import { startAudioStream, stopAudioStream } from '../features/handoff/audioStream';
 
 //
 // --- 1. BASE URL CONFIGURATION (CRITICAL!) ---
@@ -8,7 +9,9 @@ import { Alert } from 'react-native';
 // Replace '192.168.X.X' with your backend computer's local IP address.
 // You CANNOT use 'http://127.0.0.1:8000' if running on a real device.
 //
-const BASE_URL = 'http://10.19.73.68:8000'; // Updated to machine IP for Android access
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || '10.19.73.68:8000';
+
+const PROTOCOL = BASE_URL.includes('hvs.hospital') ? 'https' : 'http'; // Updated to machine IP for Android access
 //
 // ---------------------------------------------
 
@@ -25,7 +28,7 @@ export const apiLogin = async (username, password) => {
         body.append('username', username);
         body.append('password', password);
 
-        const response = await fetch(`${BASE_URL}/api/v1/login/token`, {
+        const response = await fetch(`${PROTOCOL}://${BASE_URL}/api/v1/login/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: body.toString(),
@@ -54,7 +57,7 @@ export const apiLogin = async (username, password) => {
  * Automatically adds the 'Authorization: Bearer <token>' header.
  */
 const fetchWithToken = async (endpoint, token, options = {}) => {
-    const url = `${BASE_URL}${endpoint}`;
+    const url = `${PROTOCOL}://${BASE_URL}${endpoint}`;
     console.log(`API: Calling ${options.method || 'GET'} ${url}`);
 
     // Check if token exists before making the call
@@ -203,11 +206,6 @@ export const apiCompleteTask = (taskId, token) => {
 };
 
 
-// --- Audio Recording & WebSocket Logic ---
-
-let audioSocket = null;
-let audioRecording = null;
-
 export const requestAudioPermissions = async () => {
     console.log('Requesting microphone permissions...');
     try {
@@ -235,123 +233,47 @@ export const requestAudioPermissions = async () => {
  * Starts audio recording and connects to WebSocket for live streaming.
  * Corresponds to: WS /ws/dictation/{session_id}?encounter_id={id}&token={jwt}
  */
-export const startStreamingAudio = async (encounterId, token, onMessageReceived) => {
-    if (audioSocket || audioRecording) {
-        console.warn('Streaming already in progress.');
-        return false;
-    }
-    console.log(`Starting audio stream for encounter ${encounterId}...`);
+export const startStreamingAudio = async (encounterId, token, onTranscript, onError) => {
+    const WS_PROTOCOL = PROTOCOL === 'https' ? 'wss' : 'ws';
+    const wsUrl = `${WS_PROTOCOL}://${BASE_URL}/ws/dictation/${encounterId}?token=${token}`;
+    const ws = new WebSocket(wsUrl);
 
-    try {
-        // 1. Connect WebSocket (Add token to URL)
-        const sessionId = Date.now().toString();
-        // Replace 'http' with 'ws' for the WebSocket protocol
-        const websocketUrl = `${BASE_URL.replace('http', 'ws')}/ws/dictation/${sessionId}?encounter_id=${encounterId}&token=${token}`;
-        console.log('Connecting to WebSocket:', websocketUrl);
+    ws.onopen = () => {
+        console.log('[Dictation] WebSocket open, starting audio stream');
+        startAudioStream((pcmChunk) => {
+            if (ws.readyState === WebSocket.OPEN) {
+               ws.send(pcmChunk);
+            }
+        });
+    };
 
-        audioSocket = new WebSocket(websocketUrl);
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.transcript) {
+            onTranscript(data.transcript, data.is_final);
+        }
+    };
 
-        audioSocket.onopen = async () => {
-            console.log('WebSocket Connected! Starting recording...');
-            // 2. Prepare Audio Recording 
-            await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-            audioRecording = new Audio.Recording();
+    ws.onerror = (error) => {
+        console.error('[Dictation] WebSocket error:', error);
+        onError(error);
+    };
 
-            // --- CRITICAL AUDIO CONFIG ---
-            // This MUST match the backend's ASR_RATE_HZ (16000)
-            await audioRecording.prepareToRecordAsync({
-                isMeteringEnabled: true,
-                android: {
-                    extension: '.pcm',
-                    outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_PCM_16BIT,
-                    audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_PCM_16BIT,
-                    sampleRate: 16000,
-                    numberOfChannels: 1,
-                },
-                ios: {
-                    extension: '.wav',
-                    audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_LOW,
-                    sampleRate: 16000,
-                    numberOfChannels: 1,
-                    linearPCMBitDepth: 16,
-                    linearPCMIsBigEndian: false,
-                    linearPCMIsFloat: false,
-                },
-            });
+    ws.onclose = (event) => {
+        console.log('[Dictation] WebSocket closed:', event.code, event.reason);
+        stopAudioStream();
+    };
 
-            // 3. Set up the streaming callback
-            // NOTE: expo-av is not a true streaming library.
-            // This is a placeholder. For real streaming, you'd use a different
-            // library or custom native code to send chunks.
-            // For now, the connection is open and the backend is waiting.
-            audioRecording.setOnRecordingStatusUpdate((status) => {
-                // (Placeholder for actual streaming logic)
-            });
-
-            await audioRecording.startAsync();
-            console.log('Recording started! (Note: True streaming not yet implemented)');
-        };
-
-        audioSocket.onmessage = (event) => {
-            // This callback receives messages from the backend (live transcript, errors, etc.)
-            console.log('WS Message:', event.data);
-            try {
-                const message = JSON.parse(event.data);
-                onMessageReceived(message); // Pass message to the React component
-            } catch (e) { console.error("WS parse error:", e); }
-        };
-
-        audioSocket.onerror = (e) => {
-            console.error('WebSocket Error:', e.message);
-            Alert.alert('Connection Error', 'Live dictation connection failed.');
-        };
-
-        audioSocket.onclose = (e) => {
-            console.log('WebSocket Closed:', e.code, e.reason);
-            // Auto-stop recording if WS closes
-            if (audioRecording) stopStreamingAudio();
-        };
-
-        return true;
-    } catch (err) {
-        console.error('Failed to start streaming', err);
-        Alert.alert('Error', `Could not start stream: ${err.message}`);
-        // Clean up resources if failed
-        if (audioRecording) await audioRecording.stopAndUnloadAsync();
-        if (audioSocket) audioSocket.close();
-        audioRecording = null;
-        audioSocket = null;
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-        return false;
-    }
-};
+    return ws;
+ };
 
 /**
  * Stops audio recording and closes WebSocket.
  * This signals the backend to finalize and save the note.
  */
-export const stopStreamingAudio = async () => {
-    console.log('Stopping audio stream...');
-
-    // --- 1. Stop Recording ---
-    if (audioRecording) {
-        try {
-            await audioRecording.stopAndUnloadAsync();
-            console.log('Recording stopped.');
-        } catch (err) {
-            console.error('Failed to stop recording', err);
-        }
+export const stopStreamingAudio = (ws) => {
+    stopAudioStream();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close(1000, 'User ended dictation');
     }
-
-    // --- 2. Close WebSocket (This triggers the backend to save the note) ---
-    if (audioSocket) {
-        try {
-            audioSocket.close(1000, "Client stopped recording"); // 1000 = Normal closure
-        } catch (e) { console.error("Error closing WebSocket:", e); }
-    }
-
-    // Reset state
-    audioRecording = null;
-    audioSocket = null;
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-};
+ };

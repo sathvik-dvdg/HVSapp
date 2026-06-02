@@ -1,8 +1,9 @@
+# ws_router.py
 import asyncio
 import logging
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
-from src.config.security import verify_token
+from src.config.security import verify_token, decode_access_token
 from src.modules.transcription.schemas import SessionState
 from src.modules.transcription.service import process_dictation_and_save_note
 from src.websocket.connection_manager import manager
@@ -11,7 +12,11 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.websocket("/ws/dictation/{encounter_id}")
-async def dictation_websocket(websocket: WebSocket, encounter_id: int):
+async def dictation_websocket(
+    websocket: WebSocket, 
+    encounter_id: int,
+    token: str = Query(...)
+):
     # Create a unique session ID for the connection manager
     session_id = f"dictation_{encounter_id}_{id(websocket)}"
     await manager.connect(session_id, websocket)
@@ -20,16 +25,20 @@ async def dictation_websocket(websocket: WebSocket, encounter_id: int):
     
     try:
         # 1. Authentication Check
-        auth_msg = await websocket.receive_json()
-        token = auth_msg.get("token")
-        
-        user_subject = verify_token(token)
-        if not user_subject:
+
+        payload = decode_access_token(token)
+        if payload is None:
             log.warning(f"Unauthorized WS attempt for encounter {encounter_id}")
             await websocket.close(code=1008)
             manager.disconnect(session_id)
             return
 
+        user_subject = payload.get("sub")
+        if not user_subject:
+            log.warning(f"Unauthorized WS attempt for encounter {encounter_id}")
+            await websocket.close(code=1008)
+            manager.disconnect(session_id)
+            return
         # 2. Initialize the Audio State Queue
         state = SessionState(
             id=session_id,

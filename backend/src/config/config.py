@@ -1,11 +1,11 @@
 # app/core/config.py
 import logging
 import os
+from typing import List
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
 # Explicitly load the .env file from the project root
-# (assuming this file is at app/core/config.py and .env is at backend/.env)
 env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env')
 load_dotenv(dotenv_path=env_path)
 
@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "default_secret_key")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 120))
+    CORS_ALLOWED_ORIGINS: List[str] = ["http://localhost:8081", "http://localhost:19006"]
 
     class Config:
-        # env_file = ".env" # pydantic-settings handles this automatically if python-dotenv is installed
         env_file_encoding = 'utf-8'
 
 try:

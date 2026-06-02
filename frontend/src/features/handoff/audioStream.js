@@ -1,27 +1,26 @@
 import LiveAudioStream from 'react-native-live-audio-stream';
-import { Alert } from 'react-native';
+import { Buffer } from 'buffer';
 
-const options = {
+const AUDIO_OPTIONS = {
   sampleRate: 16000,  // Required by Whisper
   channels: 1,        // Mono
   bitsPerSample: 16,  // 16-bit PCM
-  audioSource: 6,     // Voice recognition source on Android
-  bufferSize: 4096    // 250ms chunks
+  audioSource: 6,     // Voice Recognition source
+  bufferSize: 4096,    // Buffer size for audio chunks
 };
 
-export const startNativeAudioStream = (websocket) => {
-  LiveAudioStream.init(options);
+export const startAudioStream = (onChunk) => {
+  LiveAudioStream.init(AUDIO_OPTIONS);
   
-  LiveAudioStream.on('data', data => {
-    // data is a base64 encoded string of PCM audio
-    if (websocket && websocket.readyState === WebSocket.OPEN) {
-      websocket.send(data);
-    }
+    LiveAudioStream.on('data', (data) => {
+    // data is base64-encoded PCM; decode to binary before sending
+    const binary = Buffer.from(data, 'base64');
+    onChunk(binary);
   });
 
   LiveAudioStream.start();
 };
 
-export const stopNativeAudioStream = () => {
+export const stopAudioStream = () => {
   LiveAudioStream.stop();
 };

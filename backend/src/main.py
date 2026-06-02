@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.db.session import engine
+from src.config.config import settings
 # Import domain-specific routers
 from src.modules.auth import router as auth_router
 from src.modules.patients import router as patient_router
@@ -29,10 +30,10 @@ app = FastAPI(title="HVS API Gateway", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # TODO: Restrict in production
+    allow_origins=settings.CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 # --- Register Routers ---

@@ -11,6 +11,7 @@ from sqlalchemy import desc
 from src.config.security import get_password_hash, verify_password
 from src.modules.auth.models import User, UserRole
 from src.modules.auth.schemas import UserCreate
+
 log = logging.getLogger(__name__)
 
 # --- User Retrieval ---

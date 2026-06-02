@@ -8,7 +8,7 @@ import {
     startStreamingAudio,
     stopStreamingAudio,
     apiGetPatientDetails
-} from '../../../api/api';
+} from '../../../services/legacy_api';
 import { COLORS, FONTS, SIZES } from '../../../constants/theme';
 
 export default function DictationScreen() {
@@ -20,6 +20,7 @@ export default function DictationScreen() {
     const [transcript, setTranscript] = useState('');
     const [status, setStatus] = useState('Ready to record');
     const [isSaving, setIsSaving] = useState(false);
+    const [wsRef, setWsRef] = useState(null);
 
     // Request permissions on mount
     useEffect(() => {
@@ -57,7 +58,8 @@ export default function DictationScreen() {
     const handleToggleRecording = async () => {
         if (isRecording) {
             // Stop Recording
-            await stopStreamingAudio();
+            stopStreamingAudio(wsRef);
+            setWsRef(null);
             setIsRecording(false);
             setStatus('Recording stopped. Review your note.');
         } else {
@@ -70,38 +72,30 @@ export default function DictationScreen() {
             }
 
             setStatus('Connecting...');
-            const success = await startStreamingAudio(
+                const ws = await startStreamingAudio(
                 targetEncounterId,
                 userToken,
-                (message) => {
-                    // WebSocket Message Handler
-                    if (message.type === 'transcript') {
-                        setTranscript(prev => prev + ' ' + message.text);
-                    } else if (message.type === 'transcript_update') {
-                        // Handle the new format from backend
-                        if (message.is_final) {
-                            setTranscript(prev => prev + message.text + " ");
-                        }
-                        // Optionally handle interim results if we want to show them
-                    } else if (message.type === 'error') {
-                        Alert.alert("ASR Error", message.message);
-                        setIsRecording(false);
-                    }
+                (text, isFinal) => {
+                    setTranscript(prev => isFinal ? prev + text + ' ' : prev + text);
+                },
+                (err) => {
+                    Alert.alert("Dictation Error", err.message);
+                    setIsRecording(false);
+                    setWsRef(null);
+                    setStatus('Error occurred');
                 }
             );
 
-            if (success) {
-                setIsRecording(true);
-                setStatus('Listening...');
-            } else {
-                setStatus('Connection failed');
-            }
+            setWsRef(ws);
+            setIsRecording(true);
+            setStatus('Listening...');
         }
     };
 
     const handleSave = async () => {
         if (isRecording) {
-            await stopStreamingAudio();
+            stopStreamingAudio(wsRef);
+            setWsRef(null); 
             setIsRecording(false);
         }
 
