@@ -1,13 +1,10 @@
-# app/db/base.py
-
-# Import the Base class that all models inherit from
+# src/db/base.py
 from src.db.base_class import Base
 
 # --- CRITICAL ---
-# Import all your models here so that Alembic can
-# detect them and generate migrations.
-from src.schemas.user import User
-from src.schemas.patient import Patient
-from src.schemas.encounter import Encounter
-from src.schemas.note import ClinicalNote
-from src.schemas.task import NurseTask
+from src.modules.auth.models import User
+from src.modules.patients.models import Patient
+from src.modules.patients.encounter_models import Encounter
+from src.modules.patients.note_models import ClinicalNote
+
+from src.modules.tasks.models import NurseTask

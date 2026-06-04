@@ -66,17 +66,12 @@ def register_user(
     log.info(f"Successfully registered user: {new_user.username}")
     return new_user
 
+    
 @router.post("/login/token", response_model=Token, summary="Login for Access Token")
 def login_for_access_token(
     db: Session = Depends(get_db),
-    # OAuth2PasswordRequestForm requires data to be sent as x-www-form-urlencoded
     form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
-    """
-    OAuth2 compatible token login, get an access token for future requests.
-    """
-    log.info(f"Login attempt for username: {form_data.username}")
-    
     # Authenticate the user
     user = user_service.authenticate_user(
         db, username=form_data.username, password=form_data.password
@@ -89,7 +84,8 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
         
-    # Create and return the access token
-    access_token = create_access_token(subject=user.username) # Use username as JWT subject
+    # Pass BOTH the username and the string value of the user's role
+    access_token = create_access_token(subject=user.username, role=user.role.value)
+    
     log.info(f"Login successful for user: {user.username}")
     return {"access_token": access_token, "token_type": "bearer"}

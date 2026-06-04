@@ -2,19 +2,10 @@ import { Audio } from 'expo-av'; // For permission requests
 import { Alert } from 'react-native';
 import { startAudioStream, stopAudioStream } from '../features/handoff/audioStream';
 
-//
 // --- 1. BASE URL CONFIGURATION (CRITICAL!) ---
-//
-// THIS IS THE MOST IMPORTANT LINE.
-// Replace '192.168.X.X' with your backend computer's local IP address.
-// You CANNOT use 'http://127.0.0.1:8000' if running on a real device.
-//
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || '10.19.73.68:8000';
-
-const PROTOCOL = BASE_URL.includes('hvs.hospital') ? 'https' : 'http'; // Updated to machine IP for Android access
-//
+// Consumes the full URL from .env.development
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.19.73.68:8000';
 // ---------------------------------------------
-
 
 /**
  * Performs login using username and password (x-www-form-urlencoded).
@@ -23,18 +14,28 @@ const PROTOCOL = BASE_URL.includes('hvs.hospital') ? 'https' : 'http'; // Update
 export const apiLogin = async (username, password) => {
     console.log(`API: Attempting login for ${username}`);
     try {
-        // Use URLSearchParams for form-urlencoded data, as required by backend
         const body = new URLSearchParams();
         body.append('username', username);
         body.append('password', password);
 
-        const response = await fetch(`${PROTOCOL}://${BASE_URL}/api/v1/login/token`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/login/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: body.toString(),
         });
 
-        const data = await response.json();
+        // 1. Read the raw response text first
+        const rawText = await response.text();
+        let data;
+
+        // 2. Safely attempt to parse it as JSON
+        try {
+            data = JSON.parse(rawText);
+        } catch (parseError) {
+            // 3. If parsing fails, throw the raw server output (e.g., "Internal Server Error")
+            throw new Error(`Server Error (${response.status}): ${rawText}`);
+        }
+
         if (!response.ok) {
             throw new Error(data.detail || 'Login failed');
         }
@@ -43,7 +44,7 @@ export const apiLogin = async (username, password) => {
         }
 
         console.log('API: Login successful.');
-        return data.access_token; // Return only the token
+        return data.access_token;
 
     } catch (error) {
         console.error('API Error (apiLogin):', error);
@@ -51,16 +52,13 @@ export const apiLogin = async (username, password) => {
         return null;
     }
 };
-
 /**
  * Generic helper function for making authenticated API calls (JSON).
- * Automatically adds the 'Authorization: Bearer <token>' header.
  */
 const fetchWithToken = async (endpoint, token, options = {}) => {
-    const url = `${PROTOCOL}://${BASE_URL}${endpoint}`;
+    const url = `${API_BASE_URL}${endpoint}`;
     console.log(`API: Calling ${options.method || 'GET'} ${url}`);
 
-    // Check if token exists before making the call
     if (!token) {
         Alert.alert('Authentication Error', 'No auth token found. Please log in again.');
         throw new Error('No auth token found');
@@ -69,23 +67,21 @@ const fetchWithToken = async (endpoint, token, options = {}) => {
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers,
-        'Authorization': `Bearer ${token}`, // Adds the JWT
+        'Authorization': `Bearer ${token}`,
     };
 
     try {
         const response = await fetch(url, { ...options, headers });
 
-        // Handle common auth errors
-        if (response.status === 401) { // Unauthorized
+        if (response.status === 401) {
             Alert.alert('Unauthorized', 'Your session expired. Please log in again.');
             throw new Error('Unauthorized');
         }
-        if (response.status === 403) { // Forbidden
+        if (response.status === 403) {
             Alert.alert('Access Denied', 'You do not have permission for this action.');
             throw new Error('Forbidden');
         }
 
-        // Handle successful but empty responses (e.g., PATCH, DELETE)
         if (response.status === 204 || response.headers.get('content-length') === '0') {
             return { success: true };
         }
@@ -93,28 +89,22 @@ const fetchWithToken = async (endpoint, token, options = {}) => {
         const data = await response.json();
 
         if (!response.ok) {
-            // Use the specific error message from the backend
             const errorMessage = data.detail ?
                 (typeof data.detail === 'object' ? JSON.stringify(data.detail) : data.detail)
                 : `API Error ${response.status}`;
             throw new Error(errorMessage);
         }
 
-        return data; // Return the JSON data from the backend
+        return data;
 
     } catch (error) {
         console.error(`API Error (fetchWithToken ${endpoint}):`, error.message);
-        if (error.message && error.message.includes('[object Object]')) {
-            console.error('Full Error Object:', JSON.stringify(error, null, 2));
-        }
-        // Alert the user only if it's not one of our custom errors
         if (error.message !== 'Unauthorized' && error.message !== 'Forbidden') {
             Alert.alert('API Error', error.message);
         }
-        throw error; // Re-throw for the component to handle (e.g., stop loading)
+        throw error;
     }
 };
-
 
 // --- Admin Functions ---
 export const apiAdminCreateUser = (userData, adminToken) => {
@@ -127,7 +117,6 @@ export const apiAdminCreateUser = (userData, adminToken) => {
 export const apiAdminGetUserList = (adminToken) => {
     return fetchWithToken('/api/v1/admin/users', adminToken);
 };
-
 
 // --- Patient and Encounter Functions ---
 export const apiRegisterPatient = (patientData, token) => {
@@ -182,7 +171,6 @@ export const apiGetEncounterNotes = (encounterId, token) => {
     return fetchWithToken(`/api/v1/encounters/${encounterId}/notes`, token);
 };
 
-
 // --- Task Management Functions ---
 export const apiGetMyTasks = (token) => {
     return fetchWithToken('/api/v1/tasks/me', token);
@@ -204,7 +192,6 @@ export const apiCompleteTask = (taskId, token) => {
         method: 'PATCH',
     });
 };
-
 
 export const requestAudioPermissions = async () => {
     console.log('Requesting microphone permissions...');
@@ -231,11 +218,10 @@ export const requestAudioPermissions = async () => {
 
 /**
  * Starts audio recording and connects to WebSocket for live streaming.
- * Corresponds to: WS /ws/dictation/{session_id}?encounter_id={id}&token={jwt}
  */
 export const startStreamingAudio = async (encounterId, token, onTranscript, onError) => {
-    const WS_PROTOCOL = PROTOCOL === 'https' ? 'wss' : 'ws';
-    const wsUrl = `${WS_PROTOCOL}://${BASE_URL}/ws/dictation/${encounterId}?token=${token}`;
+    // Converts http:// to ws:// and https:// to wss:// natively
+    const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws/dictation/${encounterId}?token=${token}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -267,10 +253,6 @@ export const startStreamingAudio = async (encounterId, token, onTranscript, onEr
     return ws;
  };
 
-/**
- * Stops audio recording and closes WebSocket.
- * This signals the backend to finalize and save the note.
- */
 export const stopStreamingAudio = (ws) => {
     stopAudioStream();
     if (ws && ws.readyState === WebSocket.OPEN) {

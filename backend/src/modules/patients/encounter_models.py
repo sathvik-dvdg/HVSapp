@@ -83,15 +83,19 @@ class Encounter(Base):
     # --- Relationships ---
     # Many-to-one: Many Encounters belong to one Patient
     patient: Mapped["Patient"] = relationship("Patient", back_populates="encounters")
-
     # One-to-many: One Encounter can have many Clinical Notes
     notes: Mapped[List["ClinicalNote"]] = relationship(
         "ClinicalNote", back_populates="encounter", cascade="all, delete-orphan", lazy="selectin"
     )
 
     # One-to-many: One Encounter can have many Nurse Tasks
-    tasks: Mapped[List["NurseTask"]] = relationship(
-        "NurseTask", back_populates="encounter", cascade="all, delete-orphan", lazy="selectin"
+    
+    # tasks: Mapped[List["NurseTask"]] = relationship(
+    #     "NurseTask", back_populates="encounter", cascade="all, delete-orphan", lazy="selectin"
+    # )
+
+    notes: Mapped[List["ClinicalNote"]] = relationship(
+        "ClinicalNote", back_populates="encounter", cascade="all, delete-orphan", lazy="selectin"
     )
 
     def __repr__(self) -> str:

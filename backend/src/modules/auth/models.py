@@ -51,9 +51,15 @@ class User(Base):
     )
 
     # One-to-many: One User (Nurse) can be assigned many Tasks
-    assigned_tasks: Mapped[List["NurseTask"]] = relationship(
-        "NurseTask",
-        back_populates="assigned_nurse",  # Links to 'assigned_nurse' in NurseTask
+    # assigned_tasks: Mapped[List["NurseTask"]] = relationship(
+    #     "NurseTask",
+    #     back_populates="assigned_nurse",  # Links to 'assigned_nurse' in NurseTask
+    #     lazy="selectin"
+    # )
+
+    authored_notes: Mapped[List["ClinicalNote"]] = relationship(
+        "ClinicalNote",
+        back_populates="author",  # Links to 'author' in ClinicalNote
         lazy="selectin"
     )
 

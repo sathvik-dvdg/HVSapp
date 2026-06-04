@@ -35,10 +35,9 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 # --- JWT Token Utilities ---
-def create_access_token(subject: Any, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(subject: Any, role: str = None, expires_delta: Optional[timedelta] = None) -> str:
     """
-    Generates a JWT access token.
-    'subject' can be the user's ID or username (must be convertible to string).
+    Generates a JWT access token containing the user's ID/username and role.
     """
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -47,11 +46,13 @@ def create_access_token(subject: Any, expires_delta: Optional[timedelta] = None)
             minutes=ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
-    # 'sub' (subject) is the standard JWT claim for the user's identity
+    # Embed both the subject and the role in the payload
     to_encode = {"exp": expire, "sub": str(subject)}
+    if role:
+        to_encode["role"] = role
+        
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
-
 def decode_access_token(token: str) -> dict | None:
     """
     Decodes the access token and returns the full payload.
