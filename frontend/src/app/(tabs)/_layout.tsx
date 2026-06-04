@@ -1,9 +1,9 @@
 // app/(tabs)/_layout.js
 import { Tabs } from 'expo-router';
 import React from 'react';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { COLORS } from '../../constants/theme';
-import { useAuth } from '../../context/AuthContext';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+import { COLORS } from '../../shared/constants/theme';
+import { useAuth } from '../../features/auth/AuthContext';
 
 export default function TabLayout() {
   const { userRole } = useAuth(); // Get the user's role

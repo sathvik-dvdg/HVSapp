@@ -4,9 +4,9 @@ import { View, Text, StyleSheet, Alert, ScrollView, RefreshControl } from 'react
 import { ActivityIndicator, Card, Checkbox, FAB } from 'react-native-paper';
 import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 // --- Corrected Import Paths ---
-import { useAuth } from '../../../context/AuthContext';
-import { apiGetPatientDetails, apiGetEncounterTasks, apiCompleteTask } from '../../../api/api';
-import { COLORS, FONTS, SIZES } from '../../../constants/theme';
+import { useAuth } from '../../../features/auth/AuthContext';
+import { apiGetPatientDetails, apiGetEncounterTasks, apiCompleteTask } from '../../../services/legacy_api';
+import { COLORS, FONTS, SIZES } from '../../../shared/constants/theme';
 
 // Helper to format dates
 const formatDate = (dateString) => {

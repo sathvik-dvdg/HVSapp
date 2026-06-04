@@ -10,9 +10,9 @@ import {
   ScrollView,
 } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
-import { useAuth } from '../../context/AuthContext';
-import { apiRegisterPatient, apiCreateEncounter } from '../../api/api';
-import { COLORS, FONTS, SIZES } from '../../constants/theme';
+import { useAuth } from '../../features/auth/AuthContext';
+import { apiGetCriticalAlerts, apiGetMyTasks } from '../../services/legacy_api';
+import { COLORS, FONTS, SIZES } from '../../shared/constants/theme';
 import { useRouter } from 'expo-router';
 
 export default function RegisterPatientScreen() {

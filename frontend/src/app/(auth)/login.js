@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Button, TextInput } from 'react-native-paper'; // Using Paper components for style
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../features/auth/AuthContext';
 
 // Import theme settings if you have them
 // import { COLORS, FONTS, SIZES } from '../../constants/theme';

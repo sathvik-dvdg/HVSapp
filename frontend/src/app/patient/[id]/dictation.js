@@ -2,14 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Text, Button, Card, Title, Paragraph, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '../../../features/auth/AuthContext';
 import {
     requestAudioPermissions,
     startStreamingAudio,
     stopStreamingAudio,
     apiGetPatientDetails
 } from '../../../services/legacy_api';
-import { COLORS, FONTS, SIZES } from '../../../constants/theme';
+import { COLORS, FONTS, SIZES } from '../../../shared/constants/theme';
 
 export default function DictationScreen() {
     const { id: patientId, encounterId } = useLocalSearchParams();

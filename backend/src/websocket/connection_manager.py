@@ -1,4 +1,4 @@
-# app/utils/connection_manager.py
+# connection_manager.py
 import logging
 from typing import Dict, List
 from fastapi import WebSocket

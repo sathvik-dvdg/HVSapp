@@ -1,9 +1,10 @@
 import logging
-import subprocess
-import sys
-from sqlalchemy import text
+import traceback
+from sqlalchemy import text, inspect
 from src.db.session import engine
 from src.config.security import get_password_hash
+from alembic.config import Config
+from alembic import command
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -17,29 +18,30 @@ def run_setup():
             conn.execute(text("GRANT ALL ON SCHEMA public TO public;"))
         log.info("Database wiped clean successfully.")
     except Exception as e:
-        log.error(f"Failed to wipe database: {e}")
+        print(f"Failed to wipe database: {e}")
         return
 
     log.info("--- 2. RUNNING MIGRATIONS ---")
     try:
-        # We use subprocess to force Alembic to run exactly as it would in the terminal
-        # and capture any hidden errors. Note: 'alembic.config' is the correct module.
-        log.info("Executing Alembic upgrade...")
-        result = subprocess.run(
-            [sys.executable, "-m", "alembic.config", "upgrade", "head"],
-            capture_output=True,
-            text=True
-        )
+        # Extract the exact database URL without masking the password
+        url = engine.url.render_as_string(hide_password=False)
         
-        if result.returncode != 0:
-            log.error("--- MIGRATION FAILED! ---")
-            log.error(f"STDOUT:\n{result.stdout}")
-            log.error(f"STDERR:\n{result.stderr}")
+        alembic_cfg = Config("alembic.ini")
+        alembic_cfg.set_main_option("sqlalchemy.url", url.replace('%', '%%'))
+        
+        command.upgrade(alembic_cfg, "head")
+        print("Migrations successfully applied.")
+        
+        inspector = inspect(engine)
+        if 'users' not in inspector.get_table_names():
+            print("CRITICAL ERROR: 'users' table is still missing after migration.")
             return
             
-        log.info("Migrations successfully applied.")
     except Exception as e:
-        log.error(f"Failed to run migrations subprocess: {e}")
+        print("\n" + "="*50)
+        print("🚨 MIGRATION FAILED 🚨")
+        print("="*50)
+        traceback.print_exc()
         return
 
     log.info("--- 3. CREATING ADMIN USER ---")
@@ -49,7 +51,7 @@ def run_setup():
             conn.execute(
                 text("""
                     INSERT INTO users (username, hashed_password, full_name, role) 
-                    VALUES (:username, :password, :full_name, 'admin')
+                    VALUES (:username, :password, :full_name, 'ADMIN')
                 """),
                 {
                     "username": "admin@hospital.com",
@@ -57,9 +59,9 @@ def run_setup():
                     "full_name": "Hospital Admin"
                 }
             )
-        log.info("Successfully created admin user: admin@hospital.com")
+        print("Successfully created admin user: admin@hospital.com")
     except Exception as e:
-        log.error(f"Failed to create admin: {e}")
+        print(f"Failed to create admin: {e}")
 
 if __name__ == "__main__":
     run_setup()

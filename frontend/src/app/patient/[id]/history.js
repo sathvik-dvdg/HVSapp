@@ -4,10 +4,10 @@ import { View, Text, StyleSheet, Alert, ScrollView, RefreshControl, FlatList } f
 import { ActivityIndicator, Card, Title, Paragraph, Chip } from 'react-native-paper';
 import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 // --- Corrected Import Paths ---
-import { useAuth } from '../../../context/AuthContext';
-import { apiGetPatientHistory } from '../../../api/api';
-import { COLORS, FONTS, SIZES } from '../../../constants/theme';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../../../features/auth/AuthContext';
+import { apiGetPatientHistory } from '../../../services/legacy_api';
+import { COLORS, FONTS, SIZES } from '../../../shared/constants/theme';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 // Helper to format dates
 const formatDate = (dateString) => {

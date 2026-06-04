@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { jwtDecode } from 'jwt-decode'; // Import the decoder
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
-import { apiLogin } from '../api/api.js'; // Use our api.js
+import { apiLogin } from '../../services/legacy_api';
 
 // Define a key for storing the token
 const KEY_USER_TOKEN = 'userToken';

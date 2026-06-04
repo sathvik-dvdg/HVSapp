@@ -10,10 +10,10 @@ import {
   Text
 } from 'react-native';
 import { Button, SegmentedButtons, TextInput } from 'react-native-paper';
-import { apiAdminCreateUser } from '../../api/api.js';
-import { useAuth } from '../../context/AuthContext.js';
+import { apiAdminCreateUser } from '../../services/legacy_api.js';
+import { useAuth } from '../../features/auth/AuthContext';
 // Import theme (ensure this path is correct)
-import { COLORS, FONTS, SIZES } from '../../constants/theme';
+import { COLORS, FONTS, SIZES } from '../../shared/constants/theme';
 
 // Renamed component to match file name convention
 export default function CreateUserScreen() {

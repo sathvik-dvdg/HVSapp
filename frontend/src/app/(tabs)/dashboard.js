@@ -1,10 +1,10 @@
 // app/(tabs)/dashboard.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
-import { useAuth } from '../../context/AuthContext';
-import { apiGetCriticalAlerts, apiGetMyTasks } from '../../api/api';
+import { useAuth } from '../../features/auth/AuthContext';
+import { apiGetCriticalAlerts, apiGetMyTasks } from '../../services/legacy_api';
 import { Appbar, Card, Title, Paragraph, ActivityIndicator, Button } from 'react-native-paper';
-import { COLORS, FONTS, SIZES } from '../../constants/theme';
+import { COLORS, FONTS, SIZES } from '../../shared/constants/theme';
 import { Link } from 'expo-router'; // Use Link for navigation
 
 export default function DashboardScreen() {

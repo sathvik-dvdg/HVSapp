@@ -2,24 +2,8 @@
 import { DefaultTheme as PaperDefaultTheme } from 'react-native-paper';
 
 export const COLORS = {
-  // Brand Colors
-  primary: '#0067a7',
-  accent: '#00a9e0',   // A bright, modern secondary blue for highlights
-  
-  // Neutral Colors
-  white: '#FFFFFF',
-  black: '#000000',
-  text: '#333333',     // Dark gray for primary text
-  textLight: '#777777', // Lighter gray for subtitles
-  background: '#F8F9FA', // A very light gray for screen backgrounds
-  surface: '#FFFFFF',  // Background for cards, inputs, etc.
-  border: '#E0E0E0',   // Border color for inputs and cards
-
-  // Status Colors
-  success: '#28a745',
-  warning: '#ffc107',
-  danger: '#dc3545',
-  info: '#17a2b8',
+  light: { text: '#000', background: '#fff', tint: '#2f95dc' },
+  dark: { text: '#fff', background: '#000', tint: '#fff' }
 };
 
 export const SIZES = {

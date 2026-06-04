@@ -2,7 +2,7 @@ import { SplashScreen, Stack, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 // import { Provider as PaperProvider } from 'react-native-paper';
 // import { PaperTheme } from '../constants/theme';
-import { AuthProvider, useAuth } from '../context/AuthContext';
+import { AuthProvider, useAuth } from '../features/auth/AuthContext';
 import LoadingScreen from './utility/LoadingScreen';
 
 // Prevent the native splash screen from auto-hiding before auth check is complete

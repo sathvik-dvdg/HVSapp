@@ -2,8 +2,8 @@
 import React from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { Button, Title, Card, Paragraph } from 'react-native-paper';
-import { useAuth } from '../../context/AuthContext';
-import { COLORS, FONTS, SIZES } from '../../constants/theme';
+import { useAuth } from '../../features/auth/AuthContext';
+import { COLORS, FONTS, SIZES } from '../../shared/constants/theme';
 
 export default function SettingsScreen() {
   const { signOut, userRole } = useAuth(); // Get the signOut function

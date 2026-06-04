@@ -5,8 +5,7 @@ import { createMaterialTopTabNavigator } from '@react-navigation/material-top-ta
 import { Stack, useLocalSearchParams, withLayoutContext } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // --- Corrected Import Paths ---
-import { COLORS, FONTS, SIZES } from '../../../constants/theme';
-
+import { COLORS, FONTS, SIZES } from '../../../shared/constants/theme';
 const { Navigator } = createMaterialTopTabNavigator();
 // Create a custom Expo Router navigator that wraps the Material Top Tabs
 const MaterialTopTabs = withLayoutContext(Navigator);
