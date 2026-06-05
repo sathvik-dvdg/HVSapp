@@ -13,8 +13,8 @@ from src.modules.auth.models import User, UserRole
 
 log = logging.getLogger(__name__)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login/token")
-oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/login/token", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=False)
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     """

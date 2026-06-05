@@ -22,4 +22,5 @@ google-cloud-speech==2.27.0
 google-auth==2.35.0
 
 # Async File Handling
-aiofiles==24.1.0
+aiofiles==24.1.0celery[redis]==5.3.6
+redis==5.0.1

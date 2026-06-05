@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "default_secret_key")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 120))
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
     CORS_ALLOWED_ORIGINS: List[str] = ["http://localhost:8081", "http://localhost:19006"]
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     class Config:
         env_file_encoding = 'utf-8'

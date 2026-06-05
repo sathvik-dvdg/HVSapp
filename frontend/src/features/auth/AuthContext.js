@@ -1,114 +1,78 @@
-// context/AuthContext.js
-import 'core-js/stable/atob'; // Polyfill for base64 decoding
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { jwtDecode } from 'jwt-decode'; // Import the decoder
-import { createContext, useContext, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
-import { apiLogin } from '../../services/legacy_api';
+// FIXED: Changed '../services/api' to '../../services/api'
+import { login as apiLogin, logout as apiLogout, setTokens, clearTokens, createAlertsSocket } from '../../services/api';
 
-// Define a key for storing the token
-const KEY_USER_TOKEN = 'userToken';
+const AuthContext = createContext(null);
 
-// --- CRITICAL: EXPORT THE CONTEXT ---
-export const AuthContext = createContext();
-
-export const AuthProvider = ({ children }) => {
-    const [userToken, setUserToken] = useState(null);
-    const [userRole, setUserRole] = useState(null); // 'admin', 'doctor', 'nurse'
-    const [isLoading, setIsLoading] = useState(true); // Start loading
-
-    // --- 1. Load Token on App Start ---
-    useEffect(() => {
-        const bootstrapAsync = async () => {
-            let token = null;
-            try {
-                token = await SecureStore.getItemAsync(KEY_USER_TOKEN);
-            } catch (e) {
-                console.error('Failed to load token from storage', e);
-            }
-
-            if (token) {
-                try {
-                    // Check if token is expired
-                    const decoded = jwtDecode(token);
-                    if (decoded.exp * 1000 > Date.now()) {
-                        setUserToken(token);
-                        // Decode the 'sub' (subject) to get the role
-                        // Our backend sets the 'sub' to the username (e.g., "admin@hospital.com")
-                        setUserRole(getRoleFromUsername(decoded.sub));
-                        console.log('Token loaded from storage.');
-                    } else {
-                        console.log('Token found, but expired. Clearing.');
-                        await SecureStore.deleteItemAsync(KEY_USER_TOKEN);
-                    }
-                } catch (e) {
-                    console.error('Failed to decode token', e);
-                    await SecureStore.deleteItemAsync(KEY_USER_TOKEN); // Corrupt token
-                }
-            }
-            setIsLoading(false);
-        };
-        bootstrapAsync();
-    }, []);
-
-    // --- 2. Sign In ---
-    const signIn = async (username, password) => {
-        setIsLoading(true);
-        const token = await apiLogin(username, password);
-        
-        if (token) {
-            setUserToken(token);
-            try {
-                // Decode token to find role
-                const decoded = jwtDecode(token);
-                const role = getRoleFromUsername(decoded.sub);
-                setUserRole(role);
-                
-                await SecureStore.setItemAsync(KEY_USER_TOKEN, token);
-                console.log(`Token saved. User logged in with role: ${role}`);
-            } catch (e) {
-                console.error('Failed to save or decode token', e);
-                Alert.alert('Error', 'Could not save login session.');
-            }
-        }
-        setIsLoading(false);
-        return token; // Return token so login screen can navigate
-    };
-
-    // --- 3. Sign Out ---
-    const signOut = async () => {
-        setUserToken(null);
-        setUserRole(null);
-        await SecureStore.deleteItemAsync(KEY_USER_TOKEN);
-        console.log('Token deleted from storage.');
-    };
-
-    // --- 4. Role Helper ---
-    // This is a temporary helper. In a real app, the backend
-    // should include the role in the JWT 'claims'.
-    const getRoleFromUsername = (username) => {
-        if (username.includes('admin')) return 'admin';
-        if (username.includes('doctor')) return 'doctor';
-        if (username.includes('nurse')) return 'nurse';
-        return null; // Default
-    };
-
-    return (
-        <AuthContext.Provider
-            value={{ 
-                userToken, 
-                userRole, // Now components can check the role
-                isLoading, 
-                signIn, 
-                signOut 
-            }}
-        >
-            {children}
-        </AuthContext.Provider>
-    );
+const PERMISSIONS = {
+  ADMIN:  ['view_patients', 'manage_users', 'view_all_encounters', 'administer_medication'],
+  DOCTOR: ['view_patients', 'create_medication_order', 'create_encounter'],
+  NURSE:  ['view_patients', 'view_own_encounter', 'administer_medication', 'update_task'],
 };
 
-// --- 5. Helper hook to use the auth context ---
+export function AuthProvider({ children }) {
+  const [user, setUser]         = useState(null);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await SecureStore.getItemAsync('hvs_auth');
+        if (stored) {
+          const { user: u, accessToken, refreshToken } = JSON.parse(stored);
+          setTokens(accessToken, refreshToken);
+          setUser(u);
+        }
+      } catch { }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  const signIn = async (username, password) => {
+    const data = await apiLogin(username, password);
+    
+    // Defaulting role to DOCTOR for testing if backend doesn't explicitly return it
+    const userData = {
+      id: 1, 
+      username: username,
+      role: 'DOCTOR', 
+    };
+
+    await SecureStore.setItemAsync('hvs_auth', JSON.stringify({
+      user: userData,
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+    }));
+    
+    setUser(userData);
+    return userData;
+  };
+
+  const signOut = async () => {
+    try { await apiLogout(); } catch (e) {}
+    await SecureStore.deleteItemAsync('hvs_auth');
+    clearTokens();
+    setUser(null);
+  };
+
+  const can = (permission) => {
+    if (!user?.role) return false;
+    return PERMISSIONS[user.role]?.includes(permission) ?? false;
+  };
+
+  return (
+    <AuthContext.Provider value={{
+      user, loading, signIn, signOut, can,
+      isAuthenticated: !!user, userId: user?.id, userRole: user?.role, token: null
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
 export const useAuth = () => {
-    return useContext(AuthContext);
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };

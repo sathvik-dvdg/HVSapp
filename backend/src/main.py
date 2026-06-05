@@ -6,11 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.db.session import engine
 from src.config.config import settings
+from src.middleware.audit_middleware import AuditMiddleware
+
 # Import domain-specific routers
 from src.modules.auth import router as auth_router
 from src.modules.patients import router as patient_router
 from src.modules.patients import encounter_router
 from src.modules.transcription import ws_router
+from src.modules.medication import router as medication_router
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -28,6 +31,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="HVS API Gateway", lifespan=lifespan)
 
+app.add_middleware(AuditMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ALLOWED_ORIGINS,
@@ -40,6 +44,7 @@ app.add_middleware(
 app.include_router(auth_router.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(patient_router.router, prefix="/api/v1/patients", tags=["Patients"])
 app.include_router(encounter_router.router, prefix="/api/v1/encounters", tags=["Encounters"])
+app.include_router(medication_router.router, prefix="/api/v1/medications", tags=["Medications"])
 app.include_router(ws_router.router, tags=["Real-Time Dictation"])
 
 @app.get("/", tags=["Root"])

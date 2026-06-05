@@ -53,6 +53,17 @@ def create_access_token(subject: Any, role: str = None, expires_delta: Optional[
         
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def create_refresh_token(subject: Any, expires_delta: Optional[timedelta] = None) -> str:
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+        )
+    to_encode = {"exp": expire, "sub": str(subject), "type": "refresh"}
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 def decode_access_token(token: str) -> dict | None:
     """
     Decodes the access token and returns the full payload.
