@@ -22,7 +22,7 @@ export default function TabLayout() {
             iconName = focused ? 'clipboard-plus' : 'clipboard-plus-outline';
           } else if (route.name === 'settings') {
             iconName = focused ? 'cog' : 'cog-outline';
-          } else if (route.name === 'createUser') { // Admin screen
+          } else if (route.name === 'createUser') {
             iconName = focused ? 'account-plus' : 'account-plus-outline';
           }
           
@@ -35,32 +35,31 @@ export default function TabLayout() {
     >
       {/* --- Standard Tabs (Visible to all) --- */}
       <Tabs.Screen 
-        name="dashboard" // Links to app/(tabs)/dashboard.js
+        name="dashboard" 
         options={{ title: 'Dashboard' }} 
       />
       <Tabs.Screen 
-        name="patients" // Links to app/(tabs)/patients.js
+        name="patients" 
         options={{ title: 'Patients' }} 
       />
       <Tabs.Screen 
-        name="register" // Links to app/(tabs)/register.js
+        name="register" 
         options={{ title: 'Register' }} 
       />
-      <Tabs.Screen name="settings"
-      options={{ title: 'Settings' }}
+      <Tabs.Screen 
+        name="settings"
+        options={{ title: 'Settings' }}
       />
 
-      {/* --- THIS IS THE FIX: Conditional Rendering --- */}
-      {/* Only render this Tab.Screen component if the user is an admin */}
-      {userRole === 'admin' && (
-        <Tabs.Screen
-          // This MUST match your file name: app/(tabs)/createUser.js
-          name="createUser" 
-          options={{
-            title: 'Create User',
-          }}
-        />
-      )}
+      {/* --- CORRECT WAY TO HIDE TABS --- */}
+      <Tabs.Screen
+        name="createUser" 
+        options={{
+          title: 'Create User',
+          // href: null completely hides the tab button from the bottom bar
+          href: userRole === 'ADMIN' ? '/createUser' : null,
+        }}
+      />
     </Tabs>
   );
 }

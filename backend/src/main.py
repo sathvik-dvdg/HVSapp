@@ -1,4 +1,5 @@
 # backend/src/main.py
+import uvicorn
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -52,5 +53,4 @@ def health_check():
     return {"Status": "HVS Backend is running!"}
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)
