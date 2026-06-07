@@ -10,7 +10,7 @@ import {
   Text
 } from 'react-native';
 import { Button, SegmentedButtons, TextInput } from 'react-native-paper';
-import { apiAdminCreateUser } from '../../services/legacy_api.js';
+import { apiAdminCreateUser } from '../../services/api';
 import { useAuth } from '../../features/auth/AuthContext';
 // Import theme (ensure this path is correct)
 import { COLORS, FONTS, SIZES } from '../../shared/constants/theme';

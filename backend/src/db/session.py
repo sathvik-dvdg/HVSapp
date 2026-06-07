@@ -3,7 +3,7 @@ import logging
 import sys
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
-from src.config.config import settings
+from src.config.settings import settings
 
 log = logging.getLogger(__name__)
 
@@ -14,12 +14,12 @@ try:
     # Create the SQLAlchemy engine using the DATABASE_URL with hardened pool settings
     engine = create_engine(
         settings.DATABASE_URL,
-        pool_size=10,            # Steady-state connections kept open
-        max_overflow=20,         # Burst connections allowed above pool_size
-        pool_timeout=30,         # Seconds to wait for a connection before raising
-        pool_recycle=1800,       # Recycle connections every 30 min (prevents stale TCP)
-        pool_pre_ping=True,      # Test connection health before use
-        echo=False,              # Set True only for debugging
+        pool_size=20,
+        max_overflow=30,
+        pool_timeout=30,
+        pool_recycle=3600,
+        pool_pre_ping=True,
+        echo=False,
     )
 
     # Enforce connection timeout at the PostgreSQL level

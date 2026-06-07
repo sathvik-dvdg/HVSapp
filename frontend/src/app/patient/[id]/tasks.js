@@ -1,23 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../features/auth/AuthContext';
+import { apiGetMedicationTasks } from '../../../services/api';
 
 export default function MedicationTasksScreen() {
     const { id: patientId } = useLocalSearchParams();
     const { token, userRole } = useAuth();
+    const router = useRouter();
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-
     const fetchTasks = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/v1/medications/tasks/${patientId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to fetch tasks');
-            const data = await response.json();
+            const data = await apiGetMedicationTasks(patientId);
             setTasks(data);
         } catch (error) {
             Alert.alert("Error", error.message);
@@ -30,56 +26,24 @@ export default function MedicationTasksScreen() {
         fetchTasks();
     }, [patientId]);
 
-    const updateTaskStatus = async (taskId, status, notes = "") => {
-        try {
-            const response = await fetch(`${API_URL}/api/v1/medications/tasks/${taskId}/status`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ status, notes })
-            });
-            
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || 'Failed to update task');
-            }
-            
-            Alert.alert("Success", `Task marked as ${status.toUpperCase()}`);
-            fetchTasks(); // Refresh the list to reflect updated status
-        } catch (error) {
-            Alert.alert("Error", error.message);
-        }
-    };
-
     const handleAdminister = (taskId) => {
-        Alert.alert(
-            "Administer Medication", 
-            "Confirm that you have administered this medication to the patient.", 
-            [
-                { text: "Cancel", style: "cancel" },
-                { text: "Confirm", onPress: () => updateTaskStatus(taskId, "administered") }
-            ]
-        );
+        const selectedTask = tasks.find((task) => task.id === taskId);
+        router.push({
+            pathname: `/patient/${patientId}/administer/${taskId}`,
+            params: {
+                patientName: selectedTask?.patient_name || 'Unknown Patient',
+                dateOfBirth: selectedTask?.patient_date_of_birth || '',
+                bedNumber: selectedTask?.bed_number || '',
+                drugName: selectedTask?.drug_name || 'Medication',
+                dose: selectedTask?.dose || '',
+                routeName: selectedTask?.route || '',
+                requiresWitness: 'false',
+            },
+        });
     };
 
     const handleSkip = (taskId) => {
-        Alert.prompt(
-            "Skip Medication",
-            "Please provide a clinical reason for skipping this medication (Required for Audit):",
-            [
-                { text: "Cancel", style: "cancel" },
-                { text: "Skip", style: "destructive", onPress: (reason) => {
-                    if (!reason || reason.trim() === "") {
-                        Alert.alert("Error", "A valid reason is required to skip medication.");
-                        return;
-                    }
-                    updateTaskStatus(taskId, "skipped", reason);
-                }}
-            ],
-            "plain-text"
-        );
+        Alert.alert("Unsupported", "Skipping medication tasks is not available in this build.");
     };
 
     const renderTask = ({ item }) => {
@@ -89,7 +53,7 @@ export default function MedicationTasksScreen() {
         return (
             <View style={styles.card}>
                 <View style={styles.headerRow}>
-                    <Text style={styles.time}>Scheduled: {new Date(item.scheduled_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                    <Text style={styles.time}>Scheduled: {new Date(item.scheduled_at || item.scheduled_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
                     <Text style={[styles.statusBadge, { backgroundColor: isPending ? '#FF9800' : (item.status === 'administered' ? '#4CAF50' : '#F44336') }]}>
                         {item.status.toUpperCase()}
                     </Text>

@@ -1,4 +1,3 @@
-# app/services/user_service.py
 import logging
 from typing import Optional, List
 from datetime import datetime, timezone
@@ -6,8 +5,9 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import desc
+from fastapi import HTTPException, status
 
-from src.config.security import get_password_hash, verify_password
+from src.config.security import create_access_token, create_refresh_token, decode_access_token, get_password_hash, verify_password
 from src.modules.auth.models import User, UserRole
 from src.modules.auth.schemas import UserCreate
 
@@ -59,15 +59,42 @@ def authenticate_user(db: Session, *, username: str, password: str) -> Optional[
 
 def update_user_refresh_token(db: Session, user: User, refresh_token: str | None):
     if refresh_token:
-        user.refresh_token = get_password_hash(refresh_token)
+        user.hashed_refresh_token = get_password_hash(refresh_token)
     else:
-        user.refresh_token = None
+        user.hashed_refresh_token = None
     db.commit()
 
 def verify_user_refresh_token(user: User, refresh_token: str) -> bool:
-    if not user.refresh_token:
+    if not user.hashed_refresh_token:
         return False
-    return verify_password(refresh_token, user.refresh_token)
+    return verify_password(refresh_token, user.hashed_refresh_token)
+
+
+def issue_token_pair(db: Session, user: User) -> dict[str, str]:
+    access_token = create_access_token(subject=str(user.id), role=user.role.value)
+    refresh_token = create_refresh_token(subject=str(user.id))
+    update_user_refresh_token(db, user, refresh_token)
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
+
+
+def rotate_refresh_token_pair(db: Session, refresh_token: str) -> dict[str, str]:
+    payload = decode_access_token(refresh_token)
+    if not payload or payload.get("type") != "refresh":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    user_id_str = payload.get("sub")
+    if not user_id_str or not user_id_str.isdigit():
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    user = get_user_by_id(db, user_id=int(user_id_str))
+    if user is None or not verify_user_refresh_token(user, refresh_token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    return issue_token_pair(db, user)
 
 def update_device_token(db: Session, user: User, device_token: str):
     """Updates the FCM device token for push notifications."""

@@ -1,59 +1,88 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import * as SecureStore from 'expo-secure-store';
-// FIXED: Changed '../services/api' to '../../services/api'
-import { login as apiLogin, logout as apiLogout, setTokens, clearTokens, createAlertsSocket } from '../../services/api';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { jwtDecode } from 'jwt-decode';
+import {
+  clearAuthSession,
+  getStoredSession,
+  loginUser,
+  logoutUser,
+  saveAuthSession,
+  setTokens,
+  setUnauthorizedHandler,
+} from '../../services/api';
 
 const AuthContext = createContext(null);
 
 const PERMISSIONS = {
-  ADMIN:  ['view_patients', 'manage_users', 'view_all_encounters', 'administer_medication'],
-  DOCTOR: ['view_patients', 'create_medication_order', 'create_encounter'],
-  NURSE:  ['view_patients', 'view_own_encounter', 'administer_medication', 'update_task'],
+  admin: ['view_patients', 'manage_users', 'view_all_encounters', 'administer_medication'],
+  doctor: ['view_patients', 'create_medication_order', 'create_encounter'],
+  nurse: ['view_patients', 'view_own_encounter', 'administer_medication', 'update_task'],
+};
+
+const buildUserFromToken = (nextAccessToken, username = null) => {
+  const decoded = jwtDecode(nextAccessToken);
+  return {
+    id: decoded.sub ? Number(decoded.sub) : null,
+    username,
+    role: typeof decoded.role === 'string' ? decoded.role.toLowerCase() : null,
+  };
 };
 
 export function AuthProvider({ children }) {
-  const [user, setUser]         = useState(null);
-  const [loading, setLoading]   = useState(true);
+  const [user, setUser] = useState(null);
+  const [userToken, setUserToken] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const stored = await SecureStore.getItemAsync('hvs_auth');
+        const stored = await getStoredSession();
         if (stored) {
-          const { user: u, accessToken, refreshToken } = JSON.parse(stored);
+          const { user: storedUser, accessToken, refreshToken } = stored;
           setTokens(accessToken, refreshToken);
-          setUser(u);
+          setUser(storedUser);
+          setUserToken(accessToken);
         }
-      } catch { }
+      } catch (error) {
+        console.error('Failed to restore auth session', error);
+        await clearAuthSession();
+      }
       finally { setLoading(false); }
     })();
   }, []);
 
-  const signIn = async (username, password) => {
-    const data = await apiLogin(username, password);
-    
-    // Defaulting role to DOCTOR for testing if backend doesn't explicitly return it
-    const userData = {
-      id: 1, 
-      username: username,
-      role: 'DOCTOR', 
-    };
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setUser(null);
+      setUserToken(null);
+    });
 
-    await SecureStore.setItemAsync('hvs_auth', JSON.stringify({
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  const signIn = async (username, password) => {
+    const data = await loginUser(username, password);
+    const userData = buildUserFromToken(data.access_token, username);
+
+    await saveAuthSession({
       user: userData,
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
-    }));
-    
+    });
+
     setUser(userData);
+    setUserToken(data.access_token);
     return userData;
   };
 
   const signOut = async () => {
-    try { await apiLogout(); } catch (e) {}
-    await SecureStore.deleteItemAsync('hvs_auth');
-    clearTokens();
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error('Logout failed', error);
+      await clearAuthSession();
+    }
     setUser(null);
+    setUserToken(null);
   };
 
   const can = (permission) => {
@@ -61,11 +90,21 @@ export function AuthProvider({ children }) {
     return PERMISSIONS[user.role]?.includes(permission) ?? false;
   };
 
+  const contextValue = useMemo(() => ({
+    user,
+    loading,
+    signIn,
+    signOut,
+    can,
+    isAuthenticated: !!user,
+    userId: user?.id ?? null,
+    userRole: user?.role ?? null,
+    userToken,
+    token: userToken,
+  }), [loading, user, userToken]);
+
   return (
-    <AuthContext.Provider value={{
-      user, loading, signIn, signOut, can,
-      isAuthenticated: !!user, userId: user?.id, userRole: user?.role, token: null
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,14 +1,12 @@
-# app/core/security.py
 import logging
 from datetime import datetime, timedelta, timezone
-import token
 from typing import Optional, Any
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 # Import the settings instance, which loads .env variables
-from src.config.config import settings
+from src.config.settings import settings
 
 # --- Password Hashing Setup ---
 # We configure passlib to use 'bcrypt' as the default scheme

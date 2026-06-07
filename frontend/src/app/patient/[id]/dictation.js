@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Audio } from 'expo-av';
 import { Text, Button, Card, Title, Paragraph, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../features/auth/AuthContext';
-import {
-    requestAudioPermissions,
-    startStreamingAudio,
-    stopStreamingAudio,
-    apiGetPatientDetails
-} from '../../../services/legacy_api';
+import { buildDictationWebSocketUrl, apiGetPatientDetails } from '../../../services/api';
+import { startAudioStream, stopAudioStream } from '../../../features/handoff/audioStream';
 import { COLORS, FONTS, SIZES } from '../../../shared/constants/theme';
 
 export default function DictationScreen() {
@@ -20,11 +17,28 @@ export default function DictationScreen() {
     const [transcript, setTranscript] = useState('');
     const [status, setStatus] = useState('Ready to record');
     const [isSaving, setIsSaving] = useState(false);
-    const [wsRef, setWsRef] = useState(null);
+    const ws = useRef(null);
+    const isRecordingRef = useRef(false);
+    const reconnectAttempt = useRef(0);
+    const reconnectTimeout = useRef(null);
+    const chunkBuffer = useRef([]);
 
     // Request permissions on mount
     useEffect(() => {
-        requestAudioPermissions();
+        Audio.requestPermissionsAsync().catch((error) => {
+            console.error('Failed to request audio permission', error);
+            Alert.alert('Permission Error', 'Unable to access microphone permissions.');
+        });
+
+        return () => {
+            if (reconnectTimeout.current) {
+                clearTimeout(reconnectTimeout.current);
+            }
+            if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+                ws.current.close(1000, 'Screen closed');
+            }
+            void stopAudioStream();
+        };
     }, []);
 
     // Fetch active encounter if not provided in params
@@ -55,15 +69,84 @@ export default function DictationScreen() {
         if (encounterId) setResolvedEncounterId(encounterId);
     }, [encounterId]);
 
+    const drainChunkBuffer = () => {
+        if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+            return;
+        }
+        while (chunkBuffer.current.length > 0 && ws.current.readyState === WebSocket.OPEN) {
+            const nextChunk = chunkBuffer.current.shift();
+            ws.current.send(nextChunk);
+        }
+    };
+
+    const connectWebSocket = (targetEncounterId) => {
+        const socketUrl = buildDictationWebSocketUrl(targetEncounterId, userToken);
+        const socket = new WebSocket(socketUrl);
+        ws.current = socket;
+
+        socket.onopen = () => {
+            reconnectAttempt.current = 0;
+            setStatus('Listening...');
+            drainChunkBuffer();
+        };
+
+        socket.onmessage = (event) => {
+            try {
+                const payload = JSON.parse(event.data);
+                if (payload.type === 'transcript_update') {
+                    setTranscript((previousTranscript) => payload.is_final
+                        ? `${previousTranscript}${payload.text} `
+                        : `${previousTranscript}${payload.text}`);
+                }
+                if (payload.status === 'asr_error') {
+                    setStatus(payload.message || 'ASR processing failed');
+                }
+            } catch (error) {
+                console.error('Failed to parse transcript payload', error);
+            }
+        };
+
+        socket.onerror = () => {
+            setStatus('Connection error');
+        };
+
+        socket.onclose = () => {
+            if (!isRecordingRef.current) {
+                return;
+            }
+            if (reconnectAttempt.current >= 5) {
+                setStatus(JSON.stringify({ error: 'connection_lost' }));
+                setIsRecording(false);
+                isRecordingRef.current = false;
+                void stopAudioStream();
+                return;
+            }
+            const nextDelay = Math.min(1000 * (2 ** reconnectAttempt.current), 30000);
+            reconnectAttempt.current += 1;
+            setStatus(`Reconnecting in ${Math.round(nextDelay / 1000)}s...`);
+            reconnectTimeout.current = setTimeout(() => connectWebSocket(targetEncounterId), nextDelay);
+        };
+    };
+
+    const queueOrSendChunk = (chunk) => {
+        if (ws.current?.readyState === WebSocket.OPEN) {
+            ws.current.send(chunk);
+            return;
+        }
+        chunkBuffer.current.push(chunk);
+    };
+
     const handleToggleRecording = async () => {
         if (isRecording) {
-            // Stop Recording
-            stopStreamingAudio(wsRef);
-            setWsRef(null);
+            await stopAudioStream();
+            if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+                ws.current.close(1000, 'User ended dictation');
+            }
+            ws.current = null;
             setIsRecording(false);
+            isRecordingRef.current = false;
             setStatus('Recording stopped. Review your note.');
         } else {
-            // Start Recording
             const targetEncounterId = resolvedEncounterId;
 
             if (!targetEncounterId) {
@@ -72,31 +155,24 @@ export default function DictationScreen() {
             }
 
             setStatus('Connecting...');
-                const ws = await startStreamingAudio(
-                targetEncounterId,
-                userToken,
-                (text, isFinal) => {
-                    setTranscript(prev => isFinal ? prev + text + ' ' : prev + text);
-                },
-                (err) => {
-                    Alert.alert("Dictation Error", err.message);
-                    setIsRecording(false);
-                    setWsRef(null);
-                    setStatus('Error occurred');
-                }
-            );
-
-            setWsRef(ws);
+            chunkBuffer.current = [];
+            reconnectAttempt.current = 0;
+            await startAudioStream(queueOrSendChunk);
+            connectWebSocket(targetEncounterId);
             setIsRecording(true);
-            setStatus('Listening...');
+            isRecordingRef.current = true;
         }
     };
 
     const handleSave = async () => {
         if (isRecording) {
-            stopStreamingAudio(wsRef);
-            setWsRef(null); 
+            await stopAudioStream();
+            if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+                ws.current.close(1000, 'Save requested');
+            }
+            ws.current = null;
             setIsRecording(false);
+            isRecordingRef.current = false;
         }
 
         setIsSaving(true);
@@ -118,7 +194,7 @@ export default function DictationScreen() {
                 <Card.Content>
                     <Title style={styles.title}>Dictate Handoff Note</Title>
                     <Paragraph>Patient ID: {patientId}</Paragraph>
-                    <Paragraph>Encounter ID: {encounterId}</Paragraph>
+                    <Paragraph>Encounter ID: {resolvedEncounterId || encounterId}</Paragraph>
                 </Card.Content>
             </Card>
 

@@ -1,9 +1,8 @@
-# app/models/user.py
 import datetime
 import enum
 from typing import List, TYPE_CHECKING
 
-from sqlalchemy import Column, Integer, String, DateTime, func, Enum as SQLEnum
+from sqlalchemy import Boolean, Column, DateTime, Enum as SQLEnum, Integer, String, func
 from sqlalchemy.orm import relationship, Mapped
 
 from src.db.base_class import Base
@@ -33,6 +32,11 @@ class User(Base):
     hashed_password: Mapped[str] = Column(String, nullable=False)
     full_name: Mapped[str | None] = Column(String, index=True, nullable=True)
     role: Mapped[UserRole] = Column(SQLEnum(UserRole), nullable=False, index=True)
+    hashed_refresh_token: Mapped[str | None] = Column(String(512), nullable=True)
+    device_token: Mapped[str | None] = Column(String(512), nullable=True)
+    ward_assignment: Mapped[str | None] = Column(String(100), nullable=True)
+    is_active: Mapped[bool] = Column(Boolean, nullable=False, default=True, server_default="true")
+    last_active: Mapped[datetime.datetime | None] = Column(DateTime(timezone=True), nullable=True)
 
     # Timestamps (managed by the database)
     created_at: Mapped[datetime.datetime] = Column(

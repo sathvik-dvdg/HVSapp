@@ -1,7 +1,8 @@
-# app/schemas/patient.py
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import date, datetime
+
+from src.modules.patients.encounter_schemas import EncounterRead
 
 # --- Base Schema (Common fields) ---
 class PatientBase(BaseModel):
@@ -32,8 +33,17 @@ class PatientRead(PatientBase):
     Includes the generated ID and timestamps.
     """
     id: str # The custom-generated patient ID
+    gender: Optional[str] = None
+    blood_group: Optional[str] = None
+    phone_number: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    known_allergies: Optional[str] = None
+    risk_flags: Optional[str] = None
+    ward: Optional[str] = None
+    bed_number: Optional[str] = None
     registration_timestamp: datetime
     created_at: datetime
+    encounters: list[EncounterRead] = Field(default_factory=list)
 
     class Config:
         from_attributes = True # Enable ORM mode (SQLAlchemy -> Pydantic)

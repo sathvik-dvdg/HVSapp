@@ -6,6 +6,7 @@ websockets==13.1
 psycopg2-binary==2.9.10
 SQLAlchemy==2.0.22
 alembic==1.11.1
+sqlalchemy-utils==0.41.2
 
 # Configuration and Settings
 python-dotenv==1.0.1
@@ -16,11 +17,15 @@ pydantic-settings==2.11.0
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
 python-jose[cryptography]==3.3.0
+cryptography==45.0.4
+slowapi==0.1.9
 
 # Google Cloud ASR
 google-cloud-speech==2.27.0
 google-auth==2.35.0
 
 # Async File Handling
-aiofiles==24.1.0celery[redis]==5.3.6
+aiofiles==24.1.0
+celery[redis]==5.3.6
 redis==5.0.1
+

@@ -5,7 +5,7 @@ import { ActivityIndicator, Card, Title, Paragraph, Chip } from 'react-native-pa
 import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 // --- Corrected Import Paths ---
 import { useAuth } from '../../../features/auth/AuthContext';
-import { apiGetPatientHistory } from '../../../services/legacy_api';
+import { apiGetPatientHistory } from '../../../services/api';
 import { COLORS, FONTS, SIZES } from '../../../shared/constants/theme';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 

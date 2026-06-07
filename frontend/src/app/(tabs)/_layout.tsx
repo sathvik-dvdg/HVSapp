@@ -7,12 +7,13 @@ import { useAuth } from '../../features/auth/AuthContext';
 
 export default function TabLayout() {
   const { userRole } = useAuth(); // Get the user's role
+  type IconName = React.ComponentProps<typeof Icon>['name'];
 
   return (
     <Tabs 
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName = 'help-circle'; // Default icon
+          let iconName: IconName = 'help-circle';
           
           if (route.name === 'dashboard') {
             iconName = focused ? 'view-dashboard' : 'view-dashboard-outline';
@@ -57,7 +58,7 @@ export default function TabLayout() {
         options={{
           title: 'Create User',
           // href: null completely hides the tab button from the bottom bar
-          href: userRole === 'ADMIN' ? '/createUser' : null,
+          href: userRole === 'admin' ? '/createUser' : null,
         }}
       />
     </Tabs>

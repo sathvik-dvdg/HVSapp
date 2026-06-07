@@ -2,16 +2,16 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from src.db.session import get_db
+from src.config.limiting import limiter
 from src.modules.auth.schemas import UserCreate, UserRead, DeviceTokenUpdate
 from src.modules.auth.token_schema import Token, RefreshTokenRequest
 from src.modules.auth.models import UserRole
 from src.modules.auth import service as user_service
-from src.config.security import create_access_token, create_refresh_token, decode_access_token
 from src.api.dependencies import get_optional_current_user, get_current_user
 
 log = logging.getLogger(__name__)
@@ -42,7 +42,9 @@ def register_user(
     return new_user
 
 @router.post("/auth/token", response_model=Token, summary="Login for Access and Refresh Tokens")
+@limiter.limit("5/minute")
 def login_for_access_token(
+    request: Request,
     db: Session = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
@@ -53,35 +55,16 @@ def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
-    access_token = create_access_token(subject=str(user.id), role=user.role.value)
-    refresh_token = create_refresh_token(subject=str(user.id))
-    user_service.update_user_refresh_token(db, user, refresh_token)
-    
-    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+    return user_service.issue_token_pair(db, user)
 
 @router.post("/auth/refresh", response_model=Token, summary="Refresh JWT using refresh token")
+@limiter.limit("5/minute")
 def refresh_token(
-    request: RefreshTokenRequest,
+    request: Request,
+    refresh_request: RefreshTokenRequest,
     db: Session = Depends(get_db)
 ) -> Any:
-    payload = decode_access_token(request.refresh_token)
-    if not payload or payload.get("type") != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-    
-    user_id_str = payload.get("sub")
-    if not user_id_str or not user_id_str.isdigit():
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-    
-    user = user_service.get_user_by_id(db, user_id=int(user_id_str))
-    if not user or not user_service.verify_user_refresh_token(user, request.refresh_token):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-        
-    access_token = create_access_token(subject=str(user.id), role=user.role.value)
-    new_refresh_token = create_refresh_token(subject=str(user.id))
-    user_service.update_user_refresh_token(db, user, new_refresh_token)
-    
-    return {"access_token": access_token, "refresh_token": new_refresh_token, "token_type": "bearer"}
+    return user_service.rotate_refresh_token_pair(db, refresh_request.refresh_token)
 
 @router.post("/auth/logout", summary="Invalidate refresh token")
 def logout(

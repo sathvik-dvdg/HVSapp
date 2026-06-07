@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity } from 'react-native';
 import { Searchbar, Card, Title, Paragraph, ActivityIndicator } from 'react-native-paper';
 import { useAuth } from '../../features/auth/AuthContext';
-import { apiSearchPatients } from '../../services/legacy_api';
+import { apiSearchPatients } from '../../services/api';
 import { COLORS, FONTS, SIZES } from '../../shared/constants/theme';
 import { Link, useRouter } from 'expo-router';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';

@@ -1,6 +1,6 @@
-# app/modules/medication/router.py
 import logging
 from typing import Any, List
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -24,7 +24,7 @@ def create_medication_order(
     return service.create_order(db=db, order_in=order_in, doctor_id=current_user.id)
 
 @router.get("/orders/{patient_id}", response_model=List[schemas.MedicationOrderRead])
-def get_patient_orders(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Any:
+def get_patient_orders(patient_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Any:
     return service.get_orders_by_patient(db=db, patient_id=patient_id)
 
 @router.put("/orders/{order_id}/status", response_model=schemas.MedicationOrderRead)
@@ -37,9 +37,26 @@ def update_order_status(order_id: int, status_update: schemas.OrderStatusUpdate,
 
 # --- Task Endpoints ---
 @router.get("/tasks/{patient_id}", response_model=List[schemas.MedicationTaskRead])
-def get_patient_tasks(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Any:
+def get_patient_tasks(patient_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Any:
     """Fetch all scheduled medication tasks for a patient."""
     return service.get_tasks_for_patient(db=db, patient_id=patient_id)
+
+
+@router.post("/tasks/{task_id}/administer", response_model=schemas.MedicationTaskRead)
+def administer_medication_task(
+    task_id: int,
+    administer_data: schemas.MedicationTaskAdminister,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    if current_user.role not in (UserRole.NURSE, UserRole.ADMIN, UserRole.DOCTOR):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only clinical staff can administer medication")
+    return service.administer_medication_task(
+        db=db,
+        task_id=task_id,
+        current_user=current_user,
+        administer_data=administer_data,
+    )
 
 @router.put("/tasks/{task_id}/status", response_model=schemas.MedicationTaskRead)
 def update_task_status(task_id: int, update_data: schemas.TaskStatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Any:

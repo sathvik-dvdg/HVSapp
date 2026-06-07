@@ -130,3 +130,5 @@ temp/
 npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*frontend-backup/
+# Added by code-review-graph
+.code-review-graph/

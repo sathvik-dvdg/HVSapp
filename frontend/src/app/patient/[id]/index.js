@@ -5,7 +5,7 @@ import { ActivityIndicator, Button, Card, Title, Paragraph } from 'react-native-
 import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 // --- Corrected Import Paths ---
 import { useAuth } from '../../../features/auth/AuthContext';
-import { apiGetPatientDetails, apiUpdateEncounter, apiCreateEncounter } from '../../../services/legacy_api';
+import { apiCreateEncounter, apiGetPatientDetails, apiUpdateEncounter } from '../../../services/api';
 import { COLORS, FONTS, SIZES } from '../../../shared/constants/theme';
 // Helper function to format dates
 const formatDate = (dateString) => {

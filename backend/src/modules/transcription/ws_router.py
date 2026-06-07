@@ -1,5 +1,5 @@
-# ws_router.py
 import asyncio
+import base64
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
@@ -52,8 +52,20 @@ async def dictation_websocket(
 
         # 4. Stream Raw Audio to the Queue
         while True:
-            data = await websocket.receive_bytes()
-            await state.audio_queue.put(data)
+            message = await websocket.receive()
+            audio_bytes = message.get("bytes")
+            audio_text = message.get("text")
+            if audio_bytes is not None:
+                await state.audio_queue.put(audio_bytes)
+                continue
+            if audio_text is not None:
+                try:
+                    await state.audio_queue.put(base64.b64decode(audio_text))
+                except Exception:
+                    log.warning("Invalid base64 audio chunk received for encounter %s", encounter_id)
+                continue
+            if message.get("type") == "websocket.disconnect":
+                break
 
     except WebSocketDisconnect:
         log.info(f"Client disconnected cleanly from encounter {encounter_id}")

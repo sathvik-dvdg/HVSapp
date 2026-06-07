@@ -5,7 +5,7 @@ import { ActivityIndicator, Card, Title, Paragraph, FAB } from 'react-native-pap
 import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 // --- Corrected Import Paths ---
 import { useAuth } from '../../../features/auth/AuthContext';
-import { apiGetPatientDetails, apiGetEncounterNotes } from '../../../services/legacy_api';
+import { apiGetEncounterNotes, apiGetPatientDetails } from '../../../services/api';
 import { COLORS, FONTS, SIZES } from '../../../shared/constants/theme';
 
 // Helper to format dates

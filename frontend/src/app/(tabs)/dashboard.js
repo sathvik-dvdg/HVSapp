@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
 import { useAuth } from '../../features/auth/AuthContext';
-import api from '../../services/api';
+import { apiGetCriticalAlerts, fetchMyTasks } from '../../services/api';
 import { Appbar, Card, Title, Paragraph, ActivityIndicator, Button } from 'react-native-paper';
 import { COLORS, FONTS, SIZES } from '../../shared/constants/theme';
 import { Link } from 'expo-router'; // Use Link for navigation
@@ -13,16 +13,6 @@ export default function DashboardScreen() {
   const [alerts, setAlerts] = useState(null);
   const [myTasks, setMyTasks] = useState([]);
 
-  const loadData = async () => {
-    try {
-        // Use the new unified api client
-        const alerts = await api.get('/encounters/alerts/critical');
-        setAlerts(alerts);
-    } catch (error) {
-        console.error("Failed to fetch alerts:", error);
-    }
-  }
-  
   // Function to fetch all necessary data
   const fetchData = async () => {
     if (!userToken) {
@@ -32,13 +22,15 @@ export default function DashboardScreen() {
     setIsLoading(true);
     try {
       // Everyone gets critical alerts
-      const alertData = await apiGetCriticalAlerts(userToken);
+      const alertData = await apiGetCriticalAlerts();
       setAlerts(alertData);
 
       // Only nurses get "My Tasks"
       if (userRole === 'nurse') {
-        const taskData = await apiGetMyTasks(userToken);
+        const taskData = await fetchMyTasks();
         setMyTasks(taskData);
+      } else {
+        setMyTasks([]);
       }
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
@@ -75,7 +67,7 @@ export default function DashboardScreen() {
         }
       >
         <Text style={styles.welcomeText}>
-          Welcome, {userRole === 'doctor' ? 'Doctor' : 'Nurse'}!
+          Welcome, {userRole === 'doctor' ? 'Doctor' : userRole === 'admin' ? 'Admin' : 'Nurse'}!
         </Text>
 
         {/* Critical Alerts Card */}

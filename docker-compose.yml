@@ -1,0 +1,106 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: hvs_app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hvs_app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    secrets:
+      - gcp_credentials
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp_credentials.json
+      FIREBASE_CREDENTIALS_PATH: /run/secrets/gcp_credentials.json
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  celery_worker:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    secrets:
+      - gcp_credentials
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp_credentials.json
+      FIREBASE_CREDENTIALS_PATH: /run/secrets/gcp_credentials.json
+    command: celery -A src.tasks.celery_app worker --loglevel=info
+
+  celery_beat:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    secrets:
+      - gcp_credentials
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp_credentials.json
+      FIREBASE_CREDENTIALS_PATH: /run/secrets/gcp_credentials.json
+    command: celery -A src.tasks.celery_app beat --scheduler celery.beat.PersistentScheduler --loglevel=info
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+secrets:
+  gcp_credentials:
+    file: ./backend/gcp_credentials.json
+
+volumes:
+  postgres_data:
+  redis_data:

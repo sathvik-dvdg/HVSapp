@@ -1,151 +1,209 @@
 import * as SecureStore from 'expo-secure-store';
 
+const AUTH_STORAGE_KEY = 'hvs_auth';
+
 let rawUrl = process.env.EXPO_PUBLIC_API_URL;
 if (!rawUrl) {
-  console.warn("EXPO_PUBLIC_API_URL is missing. Falling back to localhost.");
+  console.warn('EXPO_PUBLIC_API_URL is missing. Falling back to localhost.');
   rawUrl = 'http://localhost:8000';
 } else if (!rawUrl.startsWith('http')) {
   rawUrl = `http://${rawUrl}`;
 }
 
 export const BASE_URL = rawUrl.replace(/\/+$/, '');
-export const WS_BASE_URL = BASE_URL.replace(/^http/, 'ws');
+export const WS_BASE_URL = BASE_URL.replace(/^http/, (protocol) => (protocol === 'https' ? 'wss' : 'ws'));
 
-console.log("[API] Configured to connect to:", BASE_URL);
+let accessToken = null;
+let refreshToken = null;
+let refreshPromise = null;
+let unauthorizedHandler = null;
 
-let _accessToken  = null;
-let _refreshToken = null;
-
-export const setTokens = (access, refresh) => {
-  _accessToken  = access;
-  _refreshToken = refresh;
+export const setTokens = (nextAccessToken, nextRefreshToken) => {
+  accessToken = nextAccessToken;
+  refreshToken = nextRefreshToken;
 };
 
 export const clearTokens = () => {
-  _accessToken  = null;
-  _refreshToken = null;
+  accessToken = null;
+  refreshToken = null;
 };
 
-let isRefreshing = false;
-let failedQueue = [];
+export const setUnauthorizedHandler = (handler) => {
+  unauthorizedHandler = handler;
+};
 
-const processQueue = (error, token = null) => {
-  failedQueue.forEach(prom => {
-    if (error) { prom.reject(error); } else { prom.resolve(token); }
+export const getStoredSession = async () => {
+  const stored = await SecureStore.getItemAsync(AUTH_STORAGE_KEY);
+  if (!stored) {
+    return null;
+  }
+  return JSON.parse(stored);
+};
+
+export const saveAuthSession = async ({ user, accessToken: nextAccessToken, refreshToken: nextRefreshToken }) => {
+  setTokens(nextAccessToken, nextRefreshToken);
+  await SecureStore.setItemAsync(
+    AUTH_STORAGE_KEY,
+    JSON.stringify({ user, accessToken: nextAccessToken, refreshToken: nextRefreshToken })
+  );
+};
+
+export const clearAuthSession = async () => {
+  clearTokens();
+  await SecureStore.deleteItemAsync(AUTH_STORAGE_KEY);
+};
+
+const parseErrorMessage = async (response) => {
+  const payload = await response.json().catch(() => ({}));
+  if (typeof payload.detail === 'string') {
+    return payload.detail;
+  }
+  if (payload.detail && typeof payload.detail === 'object') {
+    return payload.detail.message || JSON.stringify(payload.detail);
+  }
+  return `API Error: ${response.status}`;
+};
+
+const handleUnauthorized = async () => {
+  await clearAuthSession();
+  if (typeof unauthorizedHandler === 'function') {
+    unauthorizedHandler();
+  }
+};
+
+const rotateRefreshToken = async () => {
+  if (!refreshToken) {
+    throw new Error('No refresh token available');
+  }
+  const response = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
   });
-  failedQueue = [];
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response));
+  }
+
+  const payload = await response.json();
+  const currentSession = await getStoredSession();
+  await saveAuthSession({
+    user: currentSession?.user ?? null,
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token,
+  });
+  return payload.access_token;
 };
 
-async function request(method, path, body = null, isRetry = false) {
+async function request(method, path, body = null, options = {}) {
+  const { isRetry = false, headers: extraHeaders = {}, contentType = 'application/json' } = options;
   const headers = {
-    'Content-Type': 'application/json',
-    ..._accessToken ? { Authorization: `Bearer ${_accessToken}` } : {},
+    ...extraHeaders,
+    ...(contentType ? { 'Content-Type': contentType } : {}),
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
   };
 
-  if (!isRetry) console.log(`[API] ${method} ${BASE_URL}/api/v1${path}`);
-  
-  let res = await fetch(`${BASE_URL}/api/v1${path}`, {
+  const response = await fetch(`${BASE_URL}/api/v1${path}`, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body == null ? undefined : contentType === 'application/json' ? JSON.stringify(body) : body,
   });
 
-  if (res.status === 401 && !isRetry && _refreshToken && path !== '/auth/refresh') {
-    if (isRefreshing) {
-      return new Promise(function(resolve, reject) {
-        failedQueue.push({ resolve, reject });
-      }).then(token => {
-        return request(method, path, body, true);
-      }).catch(err => { throw err; });
-    }
-
-    isRefreshing = true;
+  if (response.status === 401 && !isRetry && refreshToken && path !== '/auth/refresh') {
     try {
-      const refreshRes = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: _refreshToken })
-      });
-      
-      if (!refreshRes.ok) throw new Error("Refresh failed");
-      
-      const data = await refreshRes.json();
-      setTokens(data.access_token, data.refresh_token);
-      
-      const stored = await SecureStore.getItemAsync('hvs_auth');
-      if (stored) {
-          const authData = JSON.parse(stored);
-          authData.accessToken = data.access_token;
-          authData.refreshToken = data.refresh_token;
-          await SecureStore.setItemAsync('hvs_auth', JSON.stringify(authData));
-      }
-
-      processQueue(null, data.access_token);
-      return await request(method, path, body, true);
-    } catch (err) {
-      processQueue(err, null);
-      clearTokens();
-      await SecureStore.deleteItemAsync('hvs_auth');
-      throw new Error("Session expired. Please log in again.");
+      refreshPromise = refreshPromise ?? rotateRefreshToken();
+      await refreshPromise;
+      return await request(method, path, body, { ...options, isRetry: true });
+    } catch (error) {
+      await handleUnauthorized();
+      throw error;
     } finally {
-      isRefreshing = false;
+      refreshPromise = null;
     }
   }
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || `API Error: ${res.status}`);
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response));
   }
 
-  return await res.json();
+  if (response.status === 204) {
+    return null;
+  }
+
+  const responseContentType = response.headers.get('content-type') || '';
+  if (!responseContentType.includes('application/json')) {
+    return null;
+  }
+
+  return response.json();
 }
 
 const api = {
-  get:    (path)         => request('GET',    path),
-  post:   (path, body)   => request('POST',   path, body),
-  put:    (path, body)   => request('PUT',    path, body),
-  patch:  (path, body)   => request('PATCH',  path, body),
-  delete: (path)         => request('DELETE', path),
+  get: (path) => request('GET', path),
+  post: (path, body) => request('POST', path, body),
+  put: (path, body) => request('PUT', path, body),
+  patch: (path, body) => request('PATCH', path, body),
+  delete: (path) => request('DELETE', path),
 };
 
 export default api;
 
-export const login = async (username, password) => {
+export const loginUser = async (username, password) => {
   const formData = new URLSearchParams();
   formData.append('username', username);
   formData.append('password', password);
 
-  console.log(`[API] Attempting login to ${BASE_URL}/api/v1/auth/token`);
-  const res = await fetch(`${BASE_URL}/api/v1/auth/token`, {
+  const response = await fetch(`${BASE_URL}/api/v1/auth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: formData.toString(),
   });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Login failed.');
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response));
   }
 
-  const data = await res.json();
-  setTokens(data.access_token, data.refresh_token);
-  return data;
+  const payload = await response.json();
+  setTokens(payload.access_token, payload.refresh_token);
+  return payload;
 };
 
-export const logout = async () => {
+export const logoutUser = async () => {
   try {
-    if (_refreshToken) {
-      await api.post('/auth/logout', { refresh_token: _refreshToken });
+    if (refreshToken) {
+      await api.post('/auth/logout', { refresh_token: refreshToken });
     }
   } finally {
-    clearTokens();
+    await clearAuthSession();
   }
 };
 
-export const registerDeviceToken = async (deviceToken) => {
-  return api.put('/auth/device-token', { device_token: deviceToken });
-};
+export const registerUser = async (userData) => api.post('/register', userData);
+export const registerPatient = async (patientData) => api.post('/patients/register', patientData);
+export const createEncounter = async (encounterData) => api.post('/encounters/', encounterData);
+export const updateEncounter = async (encounterId, encounterData) => api.patch(`/encounters/${encounterId}`, encounterData);
+export const fetchPatients = async (query) => api.get(`/patients/search/?query=${encodeURIComponent(query)}`);
+export const fetchPatient = async (patientId) => api.get(`/patients/${encodeURIComponent(patientId)}`);
+export const fetchPatientHistory = async (patientId) => api.get(`/patients/${encodeURIComponent(patientId)}/history`);
+export const fetchEncounterNotes = async (encounterId) => api.get(`/encounters/${encounterId}/notes`);
+export const fetchCriticalAlerts = async () => api.get('/encounters/alerts/critical');
+export const createAdminUser = async (userData) => api.post('/register', userData);
+export const fetchMedicationTasks = async (patientId) => api.get(`/medications/tasks/${encodeURIComponent(patientId)}`);
+export const administerMedicationTask = async (taskId, payload) => api.post(`/medications/tasks/${taskId}/administer`, payload);
+export const fetchMyTasks = async () => [];
+export const registerDeviceToken = async (deviceToken) => api.put('/auth/device-token', { device_token: deviceToken });
 
-export const createAlertsSocket = () => {
-  return { close: () => {} };
-};
+export const buildDictationWebSocketUrl = (encounterId, token) => `${WS_BASE_URL}/ws/dictation/${encounterId}?token=${encodeURIComponent(token)}`;
+
+export const login = loginUser;
+export const logout = logoutUser;
+export const apiRegisterPatient = registerPatient;
+export const apiCreateEncounter = createEncounter;
+export const apiUpdateEncounter = updateEncounter;
+export const apiSearchPatients = fetchPatients;
+export const apiGetPatientDetails = fetchPatient;
+export const apiGetPatientHistory = fetchPatientHistory;
+export const apiGetEncounterNotes = fetchEncounterNotes;
+export const apiGetCriticalAlerts = fetchCriticalAlerts;
+export const apiAdminCreateUser = createAdminUser;
+export const apiGetMedicationTasks = fetchMedicationTasks;
+export const apiAdministerMedicationTask = administerMedicationTask;
